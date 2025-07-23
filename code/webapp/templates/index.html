@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLOv8 Object Detection Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/2c36e9b7b1.js" crossorigin="anonymous"></script>
+    <style>
+        body { background: #f8f9fa; }
+        .dashboard-header { background: #343a40; color: #fff; padding: 1.5rem 1rem; border-radius: 0.5rem; margin-bottom: 2rem; }
+        .card { box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .preview-img {
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            width: 80%;
+            height: 90%;
+            max-width: 80%;
+            max-height: 90%;
+            background: #222;
+            object-fit: contain;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .log-area { background: #212529; color: #fff; font-size: 0.95rem; border-radius: 0.5rem; padding: 1rem; height: 180px; overflow-y: auto; }
+        .people-count { font-size: 2.5rem; font-weight: bold; color: #198754; }
+        .status-badge { font-size: 1rem; }
+        #previewArea { height: 450px; min-height: 0; display: flex; align-items: center; justify-content: center; }
+        .preview-card { height: 550px; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="dashboard-header mb-4">
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <h2 class="mb-0"><i class="fas fa-brain"></i> YOLOv8 Object Detection Dashboard</h2>
+                <small class="text-light">Real-time detection, people counting, and video source management</small>
+            </div>
+            <div>
+                <span class="badge bg-success status-badge" id="apiStatus">API: Unknown</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Detection Controls -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3"><i class="fas fa-cogs"></i> Detection Controls</h5>
+                    <form id="detectionForm" onsubmit="event.preventDefault(); startDetection();">
+                        <div class="mb-3">
+                            <label for="detectionType" class="form-label">Detection Type</label>
+                            <select class="form-select" id="detectionType" onchange="onDetectionTypeChange()">
+                                <option value="image">Image</option>
+                                <option value="video">Video File</option>
+                                <option value="camera">Camera</option>
+                                <option value="stream">Stream</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="apiSelect" class="form-label">YOLO API</label>
+                            <select class="form-select" id="apiSelect"></select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confidence" class="form-label">Confidence: <span id="confidenceValue">0.6</span></label>
+                            <input type="range" class="form-range" id="confidence" min="0.1" max="1.0" step="0.05" value="0.6" oninput="document.getElementById('confidenceValue').textContent = this.value">
+                        </div>
+                        <div class="mb-3" id="sourceInputGroup">
+                            <!-- Dynamic source input will be rendered here -->
+                        </div>
+                        <div class="mb-3" id="liveDetectionGroup" style="display: none;">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="liveDetectionMode">
+                                <label class="form-check-label" for="liveDetectionMode">
+                                    <i class="fas fa-eye"></i> Live Detection Mode
+                                </label>
+                                <small class="form-text text-muted d-block">Show real-time detection overlay in preview</small>
+                            </div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button id="detectBtn" type="submit" class="btn btn-primary"><i class="fas fa-play"></i> Start Detection</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="testSource()"><i class="fas fa-vial"></i> Test Source</button>
+                            <button type="button" class="btn btn-outline-success" onclick="scanCameras()"><i class="fas fa-camera"></i> Scan Cameras</button>
+                            <button type="button" class="btn btn-outline-info" onclick="runCameraDiagnostics()"><i class="fas fa-stethoscope"></i> Diagnostics</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <!-- People Counter -->
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <h5 class="card-title mb-3"><i class="fas fa-user-friends"></i> <span id="counterTitle">People Counter</span></h5>
+                    <div class="people-count" id="peopleCount">0</div>
+                    <div class="mb-2" id="counterCurrentLabel">Current</div>
+                    <div>Total: <span id="peopleTotal">0</span></div>
+                    <div class="mt-3">
+                        <button class="btn btn-outline-primary btn-sm" onclick="resetPeopleCounter()"><i class="fas fa-sync"></i> Reset</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Preview & Results -->
+        <div class="col-lg-8">
+            <div class="card mb-4 preview-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h5 class="card-title mb-0"><i class="fas fa-eye"></i> Live Preview</h5>
+                        <button class="btn btn-outline-warning btn-sm" id="togglePreviewBtn" onclick="togglePreview()"><i class="fas fa-eye"></i> <span id="previewToggleText">Show Preview</span></button>
+                    </div>
+                    <div id="previewArea" class="text-center">
+                        <img id="previewImg" src="" class="preview-img" style="display: none;" />
+                        <div id="previewPlaceholder" class="text-muted py-5">
+                            <i class="fas fa-video fa-3x mb-3"></i>
+                            <div>Click "Show Preview" to enable live preview</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Logs/Status -->
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-3"><i class="fas fa-terminal"></i> Logs & Status</h5>
+                    <div class="log-area" id="logArea"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// --- State ---
+let previewActive = false;
+let currentPreviewCamera = 0;
+let availableCameras = [];
+let selectedApi = '';
+
+// --- UI Setup ---
+document.addEventListener('DOMContentLoaded', function() {
+    loadAvailableApis();
+    scanCameras();
+    onDetectionTypeChange();
+    updateApiStatus();
+    updatePeopleCounter();
+});
+
+function log(msg, type='info') {
+    const logArea = document.getElementById('logArea');
+    const color = type === 'error' ? '#ff6b6b' : (type === 'success' ? '#51cf66' : '#fff');
+    logArea.innerHTML += `<div style="color:${color}">${new Date().toLocaleTimeString()} - ${msg}</div>`;
+    logArea.scrollTop = logArea.scrollHeight;
+}
+
+function updateApiStatus() {
+    fetch('/api/test-connection').then(r=>r.json()).then(data => {
+        const badge = document.getElementById('apiStatus');
+        if(data.status === 'success') {
+            badge.classList.remove('bg-danger');
+            badge.classList.add('bg-success');
+            badge.textContent = 'API: Connected';
+        } else {
+            badge.classList.remove('bg-success');
+            badge.classList.add('bg-danger');
+            badge.textContent = 'API: Disconnected';
+        }
+    });
+}
+
+function loadAvailableApis() {
+    fetch('/api/available-apis').then(r=>r.json()).then(data => {
+        const apiSelect = document.getElementById('apiSelect');
+        apiSelect.innerHTML = '';
+        (data.apis || []).forEach(api => {
+            const opt = document.createElement('option');
+            opt.value = api;
+            opt.textContent = api;
+            apiSelect.appendChild(opt);
+        });
+        if(data.apis && data.apis.length > 0) {
+            selectedApi = data.apis[0];
+        }
+        updateCounterTitle();
+    });
+}
+document.getElementById('apiSelect').addEventListener('change', updateCounterTitle);
+document.getElementById('detectionType').addEventListener('change', updateCounterTitle);
+
+// Add event listener for live detection mode
+document.addEventListener('DOMContentLoaded', function() {
+    const liveDetectionCheckbox = document.getElementById('liveDetectionMode');
+    if (liveDetectionCheckbox) {
+        liveDetectionCheckbox.addEventListener('change', function() {
+            if (document.getElementById('detectionType').value === 'camera' && previewActive) {
+                // Restart preview with new mode
+                togglePreview(); // Stop current preview
+                setTimeout(() => {
+                    togglePreview(); // Start preview with new mode
+                }, 100);
+            }
+            
+            // Start/stop polling based on live detection mode
+            if (this.checked) {
+                startLiveDetectionPolling();
+                log('Live detection polling started', 'info');
+            } else {
+                stopLiveDetectionPolling();
+                log('Live detection polling stopped', 'info');
+            }
+        });
+    }
+});
+
+function scanCameras() {
+    fetch('/api/video-sources/cameras').then(r=>r.json()).then(data => {
+        availableCameras = data.cameras || [];
+        if (availableCameras.length > 0) {
+            log(`Found ${availableCameras.length} cameras`, 'success');
+        } else {
+            log('No cameras detected. You can still try camera 0 (default)', 'info');
+        }
+    }).catch(err => {
+        log('Camera scan failed: ' + err, 'error');
+        availableCameras = []; // Reset to empty array on error
+    });
+}
+
+function runCameraDiagnostics() {
+    fetch('/api/video-sources/camera-diagnostics').then(r=>r.json()).then(data => {
+        let report = 'Camera Diagnostics:\n';
+        if(data.working_cameras) {
+            report += `Working: ${data.working_cameras.length}\n`;
+            data.working_cameras.forEach(c => report += `  - Camera ${c.index}: ${c.resolution} @ ${c.fps}fps\n`);
+        }
+        if(data.problem_cameras) {
+            report += `Problems: ${data.problem_cameras.length}\n`;
+            data.problem_cameras.forEach(c => report += `  - Camera ${c.index}: ${c.status} (${c.error})\n`);
+        }
+        alert(report);
+        log('Diagnostics complete', 'success');
+    });
+}
+
+function onDetectionTypeChange() {
+    const type = document.getElementById('detectionType').value;
+    const group = document.getElementById('sourceInputGroup');
+    const liveGroup = document.getElementById('liveDetectionGroup');
+    group.innerHTML = '';
+    
+    if(type === 'image') {
+        group.innerHTML = `<label class='form-label'>Image File</label><input type='file' class='form-control' id='sourceInput' accept='image/*'>`;
+        liveGroup.style.display = 'none';
+    } else if(type === 'video') {
+        group.innerHTML = `
+            <label class='form-label'>Video File</label>
+            <input type='file' class='form-control' id='sourceInput' accept='video/*'>
+            <div class='mt-2'>
+                <label class='form-label'>Frame Skip (Speed vs Accuracy)</label>
+                <select class='form-select' id='frameSkip'>
+                    <option value='1'>Every Frame (Slowest, Most Accurate)</option>
+                    <option value='5'>Every 5th Frame (Faster)</option>
+                    <option value='10' selected>Every 10th Frame (Recommended)</option>
+                    <option value='15'>Every 15th Frame (Fast)</option>
+                    <option value='30'>Every 30th Frame (Fastest)</option>
+                </select>
+                <small class='form-text text-muted'>Higher values = faster processing but less accurate counts</small>
+            </div>
+        `;
+        liveGroup.style.display = 'none';
+    } else if(type === 'camera') {
+        let options = '';
+        if (availableCameras.length > 0) {
+            options = availableCameras.map(c => `<option value='${c.index}'>Camera ${c.index}</option>`).join('');
+        } else {
+            // Fallback: show at least camera 0 if no cameras were detected
+            options = '<option value="0">Camera 0 (Default)</option>';
+            log('No cameras detected, showing default camera 0', 'info');
+        }
+        group.innerHTML = `<label class='form-label'>Select Camera</label><select class='form-select' id='sourceInput' onchange='onCameraChange()'>${options}</select>`;
+        liveGroup.style.display = 'block';
+        // Auto-start preview for camera
+        setTimeout(() => {
+            if (!previewActive) {
+                togglePreview();
+            }
+        }, 500);
+    } else if(type === 'stream') {
+        group.innerHTML = `<label class='form-label'>Stream URL</label><input type='text' class='form-control' id='sourceInput' placeholder='rtsp://, http://, etc.'>`;
+        liveGroup.style.display = 'none';
+    }
+    updateCounterTitle(); // Update counter title when detection type changes
+}
+
+function onCameraChange() {
+    // When camera selection changes, update preview if active
+    if (previewActive && document.getElementById('detectionType').value === 'camera') {
+        const cameraIndex = document.getElementById('sourceInput').value || 0;
+        const previewImg = document.getElementById('previewImg');
+        const liveMode = document.getElementById('liveDetectionMode')?.checked || false;
+        
+        if (liveMode) {
+            // Update live detection with current confidence
+            const apiType = document.getElementById('apiSelect').value;
+            const confidence = document.getElementById('confidence').value;
+            if (apiType.includes('person')) {
+                previewImg.src = `/camera/detect_live/${cameraIndex}?confidence=${confidence}`;
+            } else if (apiType.includes('car')) {
+                previewImg.src = `/camera/detect_live_car/${cameraIndex}?confidence=${confidence}`;
+            }
+        } else {
+            previewImg.src = `/camera/preview/${cameraIndex}`;
+        }
+        log('Switched to camera ' + cameraIndex, 'info');
+    }
+}
+
+function testSource() {
+    const source = document.getElementById('sourceInput').value;
+    fetch('/api/video-sources/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source })
+    }).then(r=>r.json()).then(data => {
+        if(data.success) {
+            log('Source test successful: ' + data.message, 'success');
+        } else {
+            log('Source test failed: ' + data.message, 'error');
+        }
+    });
+}
+
+function togglePreview() {
+    const previewImg = document.getElementById('previewImg');
+    const previewPlaceholder = document.getElementById('previewPlaceholder');
+    const btn = document.getElementById('togglePreviewBtn');
+    const type = document.getElementById('detectionType').value;
+    const liveMode = document.getElementById('liveDetectionMode')?.checked || false;
+    let cameraIndex = 0;
+    if(type === 'camera') {
+        const sourceInput = document.getElementById('sourceInput');
+        if(sourceInput && sourceInput.value) cameraIndex = sourceInput.value;
+    }
+    if(previewActive) {
+        previewImg.src = '';
+        previewImg.style.display = 'none';
+        previewPlaceholder.style.display = 'block';
+        btn.classList.remove('btn-warning');
+        btn.classList.add('btn-outline-warning');
+        document.getElementById('previewToggleText').textContent = 'Show Preview';
+        previewActive = false;
+        log('Preview stopped', 'info');
+    } else {
+        // Use different preview endpoints based on detection type and live mode
+        if(type === 'camera' && liveMode) {
+            // Use live detection endpoints
+            const apiType = document.getElementById('apiSelect').value;
+            const confidence = document.getElementById('confidence').value;
+            if (apiType.includes('person')) {
+                previewImg.src = `/camera/detect_live/${cameraIndex}?confidence=${confidence}`;
+                log('Live person detection started for camera ' + cameraIndex + ' (confidence: ' + confidence + ')', 'success');
+            } else if (apiType.includes('car')) {
+                previewImg.src = `/camera/detect_live_car/${cameraIndex}?confidence=${confidence}`;
+                log('Live car detection started for camera ' + cameraIndex + ' (confidence: ' + confidence + ')', 'success');
+            } else {
+                previewImg.src = `/camera/preview/${cameraIndex}`;
+                log('Live detection started for camera ' + cameraIndex, 'success');
+            }
+        } else if(type === 'camera') {
+            previewImg.src = `/camera/preview/${cameraIndex}`;
+        } else {
+            previewImg.src = `/video_feed/${cameraIndex}`;
+        }
+        previewImg.style.display = 'block';
+        previewPlaceholder.style.display = 'none';
+        btn.classList.remove('btn-outline-warning');
+        btn.classList.add('btn-warning');
+        document.getElementById('previewToggleText').textContent = 'Hide Preview';
+        previewActive = true;
+        log('Preview started for camera ' + cameraIndex, 'success');
+    }
+}
+
+function startDetection() {
+    log('Detection started', 'info');
+    const detectionType = document.getElementById('detectionType').value;
+    const apiType = document.getElementById('apiSelect').value;
+    const confidence = parseFloat(document.getElementById('confidence').value);
+    const sourceInput = document.getElementById('sourceInput');
+
+    // Pause camera preview during detection
+    let wasPreviewActive = false;
+    if (detectionType === 'camera' && previewActive) {
+        wasPreviewActive = true;
+        togglePreview(); // Pause preview
+        log('Paused camera preview for detection', 'info');
+    }
+
+    let endpoint = '/api/detect';
+    let payload = {
+        api_type: apiType,
+        threshold: confidence
+    };
+
+    // Helper to update counter from detection result and log human-readable result
+    function updateCounterFromResult(data) {
+        // Try all possible keys
+        let count = undefined;
+        if ('car_count' in data) count = data['car_count'];
+        else if ('person_count' in data) count = data['person_count'];
+        else if ('count' in data) count = data['count'];
+
+        if (typeof count !== 'undefined') {
+            document.getElementById('peopleCount').textContent = count;
+            document.getElementById('peopleTotal').textContent = count;
+            log(`Detection complete. Count: ${count}`, 'success');
+        } else {
+            log('Detection complete. No count found in result. Response: ' + JSON.stringify(data), 'success');
+        }
+        
+        // Resume camera preview if it was active before detection
+        if (wasPreviewActive && detectionType === 'camera') {
+            setTimeout(() => {
+                togglePreview(); // Resume preview
+                log('Resumed camera preview after detection', 'info');
+            }, 1000); // Wait 1 second before resuming
+        }
+    }
+
+    if (detectionType === 'image' || detectionType === 'video') {
+        const file = sourceInput.files[0];
+        if (!file) {
+            log('No file selected', 'error');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('api_type', apiType);
+        formData.append('threshold', confidence);
+        formData.append('file', file);
+        formData.append('detection_type', detectionType);
+        
+        // Add frame skip for video detection
+        if (detectionType === 'video') {
+            const frameSkip = document.getElementById('frameSkip')?.value || '10';
+            formData.append('frame_skip', frameSkip);
+        }
+        // Show loading message for video detection
+        if (detectionType === 'video') {
+            log('Processing video... This may take a few minutes for longer videos.', 'info');
+            // Disable the detect button to prevent multiple requests
+            document.getElementById('detectBtn').disabled = true;
+            document.getElementById('detectBtn').textContent = 'Processing...';
+        }
+        
+        // Set timeout for video detection (5 minutes)
+        const timeout = detectionType === 'video' ? 300000 : 60000; // 5 min for video, 1 min for image
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        
+        fetch('/api/detect-upload', {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal
+        })
+        .then(r => {
+            if (!r.ok) {
+                throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+            }
+            return r.json();
+        })
+        .then(data => {
+            if (!data) {
+                log('Detection failed: No response from server.', 'error');
+                return;
+            }
+            if (data.error) {
+                log('Detection error: ' + data.error, 'error');
+            } else {
+                updateCounterFromResult(data);
+                if (detectionType === 'video') {
+                    log('Video detection completed successfully!', 'success');
+                }
+            }
+            // Re-enable the detect button and reset text for both success and error cases
+            document.getElementById('detectBtn').disabled = false;
+            document.getElementById('detectBtn').textContent = 'Start Detection';
+        })
+        .catch(err => {
+            clearTimeout(timeoutId); // Clear timeout on error
+            // Re-enable the detect button
+            document.getElementById('detectBtn').disabled = false;
+            document.getElementById('detectBtn').textContent = 'Detect Objects';
+            
+            // Resume camera preview if it was active before detection
+            if (wasPreviewActive && detectionType === 'camera') {
+                setTimeout(() => {
+                    togglePreview(); // Resume preview
+                    log('Resumed camera preview after detection error', 'info');
+                }, 1000); // Wait 1 second before resuming
+            }
+            
+            log('Detection request failed: ' + err, 'error');
+        });
+        return;
+    }
+
+    // For camera/stream
+    if (detectionType === 'camera') {
+        endpoint = '/api/detect-camera';
+        payload.camera_index = parseInt(sourceInput.value) || 0;
+    } else if (detectionType === 'stream') {
+        endpoint = '/api/detect-stream';
+        payload.video_source = sourceInput.value;
+    }
+
+    // Set timeout for stream detection
+    const timeout = 120000; // 2 minutes for streams
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+    })
+    .then(r => {
+        if (!r.ok) {
+            throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+        }
+        return r.json();
+    })
+    .then(data => {
+        clearTimeout(timeoutId);
+        if (data.error) {
+            log('Detection error: ' + data.error, 'error');
+        } else {
+            updateCounterFromResult(data);
+        }
+    })
+    .catch(err => {
+        clearTimeout(timeoutId);
+        
+        // Resume camera preview if it was active before detection
+        if (wasPreviewActive && detectionType === 'camera') {
+            setTimeout(() => {
+                togglePreview(); // Resume preview
+                log('Resumed camera preview after detection error', 'info');
+            }, 1000); // Wait 1 second before resuming
+        }
+        
+        if (err.name === 'AbortError') {
+            log('Detection request timed out. Please check your video source.', 'error');
+        } else {
+            log('Detection request failed: ' + err, 'error');
+        }
+    });
+}
+
+function updatePeopleCounter() {
+    fetch('/api/people-counter/status').then(r=>r.json()).then(data => {
+        document.getElementById('peopleCount').textContent = data.current_count;
+        document.getElementById('peopleTotal').textContent = data.total_count;
+        updateCounterTitle();
+    });
+}
+function resetPeopleCounter() {
+    fetch('/api/people-counter/reset').then(()=>updatePeopleCounter());
+}
+function startPeopleCounting() {
+    fetch('/api/people-counter/start').then(()=>updatePeopleCounter());
+}
+function stopPeopleCounting() {
+    fetch('/api/people-counter/stop').then(()=>updatePeopleCounter());
+}
+
+// Add this function to update the counter title and label
+function updateCounterTitle() {
+    const apiType = document.getElementById('apiSelect').value || '';
+    let title = 'Object Counter';
+    let label = 'Current';
+    if (apiType.toLowerCase().startsWith('car')) {
+        title = 'Car Counter';
+        label = 'Current';
+    } else if (apiType.toLowerCase().startsWith('person')) {
+        title = 'People Counter';
+        label = 'Current';
+    }
+    document.getElementById('counterTitle').textContent = title;
+    document.getElementById('counterCurrentLabel').textContent = label;
+}
+
+// Live detection count polling
+let liveDetectionInterval = null;
+
+function startLiveDetectionPolling() {
+    if (liveDetectionInterval) {
+        clearInterval(liveDetectionInterval);
+    }
+    
+    liveDetectionInterval = setInterval(() => {
+        fetch('/api/live-detection/counts')
+            .then(r => r.json())
+            .then(data => {
+                if (data.person_count !== undefined || data.car_count !== undefined) {
+                    const apiType = document.getElementById('apiSelect').value || '';
+                    let count = 0;
+                    
+                    if (apiType.includes('person') && data.person_count !== undefined) {
+                        count = data.person_count;
+                        if (count > 0) {
+                            log(`Live detection: ${count} person(s) detected`, 'success');
+                        }
+                    } else if (apiType.includes('car') && data.car_count !== undefined) {
+                        count = data.car_count;
+                        if (count > 0) {
+                            log(`Live detection: ${count} car(s) detected`, 'success');
+                        }
+                    }
+                    
+                    // Update counter display
+                    document.getElementById('peopleCount').textContent = count;
+                    document.getElementById('peopleTotal').textContent = count;
+                }
+            })
+            .catch(err => {
+                // Silently handle errors to avoid spam
+            });
+    }, 2000); // Poll every 2 seconds
+}
+
+function stopLiveDetectionPolling() {
+    if (liveDetectionInterval) {
+        clearInterval(liveDetectionInterval);
+        liveDetectionInterval = null;
+    }
+}
+  </script>
+  </body>
+  </html> 

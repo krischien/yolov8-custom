@@ -1,0 +1,6 @@
+train: E:\work\yolov8_custom\code\train
+val: E:\work\yolov8_custom\code\val
+
+nc: 1
+
+names: ['car']

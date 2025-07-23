@@ -1,0 +1,82 @@
+{
+  "camera_examples": [
+    {
+      "name": "Default Camera",
+      "source": "0",
+      "description": "Primary camera (usually built-in webcam)"
+    },
+    {
+      "name": "Secondary Camera",
+      "source": "1",
+      "description": "External USB camera or secondary camera"
+    },
+    {
+      "name": "Third Camera",
+      "source": "2",
+      "description": "Additional camera device"
+    }
+  ],
+  "ip_camera_examples": [
+    {
+      "name": "RTSP Camera",
+      "source": "rtsp://192.168.1.100:554/stream",
+      "description": "IP camera with RTSP protocol"
+    },
+    {
+      "name": "HTTP Camera",
+      "source": "http://192.168.1.100:8080/video",
+      "description": "IP camera with HTTP protocol"
+    },
+    {
+      "name": "RTMP Stream",
+      "source": "rtmp://192.168.1.100:1935/live/stream",
+      "description": "RTMP streaming server"
+    },
+    {
+      "name": "Public RTSP Stream",
+      "source": "rtsp://184.72.239.149/vod/mp4:BigBuckBunny_115k.mov",
+      "description": "Public test RTSP stream"
+    }
+  ],
+  "video_file_examples": [
+    {
+      "name": "Local MP4",
+      "source": "C:/Videos/sample.mp4",
+      "description": "Local video file (Windows path)"
+    },
+    {
+      "name": "Local AVI",
+      "source": "/home/user/videos/sample.avi",
+      "description": "Local video file (Linux/Mac path)"
+    },
+    {
+      "name": "Relative Path",
+      "source": "./data/videos/sample.mp4",
+      "description": "Video file relative to current directory"
+    }
+  ],
+  "youtube_examples": [
+    {
+      "name": "YouTube Video",
+      "source": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "description": "YouTube video URL"
+    },
+    {
+      "name": "YouTube Short",
+      "source": "https://youtu.be/dQw4w9WgXcQ",
+      "description": "YouTube short URL"
+    }
+  ],
+  "custom_examples": [
+    {
+      "name": "Custom Stream",
+      "source": "udp://@:1234",
+      "description": "UDP stream on port 1234"
+    },
+    {
+      "name": "File Descriptor",
+      "source": "/dev/video0",
+      "description": "Linux video device"
+    }
+  ]
+} 
