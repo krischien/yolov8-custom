@@ -1,32 +1,20 @@
 #!/usr/bin/env python3
 """
-Simple Flask app for Railway deployment testing
+YOLOv8 Web Application - Main entry point for Railway deployment
 """
 
-from flask import Flask, jsonify
 import os
+import sys
 
-app = Flask(__name__)
+# Add the webapp directory to the Python path
+webapp_path = os.path.join(os.path.dirname(__file__), 'code', 'webapp')
+sys.path.insert(0, webapp_path)
 
-@app.route('/')
-def hello():
-    return jsonify({
-        "message": "YOLOv8 Web App is running!",
-        "status": "success",
-        "deployment": "Railway",
-        "note": "This is the root-level app for testing"
-    })
+# Change to the webapp directory for proper file resolution
+os.chdir(webapp_path)
 
-@app.route('/health')
-def health():
-    return jsonify({"status": "healthy"})
-
-@app.route('/test')
-def test():
-    return jsonify({
-        "message": "Railway deployment test successful!",
-        "structure": "Root-level app.py detected"
-    })
+# Import the Flask app from webapp directory
+from app import app
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
