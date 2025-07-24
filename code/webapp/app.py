@@ -890,8 +890,14 @@ def camera_preview_proxy(camera_index):
 def camera_detect_live_proxy(camera_index):
     """Proxy live person detection requests to YOLO API backend"""
     try:
+        # Forward query parameters to the API
+        query_string = request.query_string.decode('utf-8')
+        api_url = f"{API_BASE_URL}/camera/detect_live/{camera_index}"
+        if query_string:
+            api_url += f"?{query_string}"
+        
         response = requests.get(
-            f"{API_BASE_URL}/camera/detect_live/{camera_index}",
+            api_url,
             stream=True,
             timeout=30
         )
@@ -916,8 +922,14 @@ def camera_detect_live_proxy(camera_index):
 def camera_detect_live_car_proxy(camera_index):
     """Proxy live car detection requests to YOLO API backend"""
     try:
+        # Forward query parameters to the API
+        query_string = request.query_string.decode('utf-8')
+        api_url = f"{API_BASE_URL}/camera/detect_live_car/{camera_index}"
+        if query_string:
+            api_url += f"?{query_string}"
+        
         response = requests.get(
-            f"{API_BASE_URL}/camera/detect_live_car/{camera_index}",
+            api_url,
             stream=True,
             timeout=30
         )

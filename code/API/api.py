@@ -52,7 +52,7 @@ def detect_image():
         image_path = data['image_path']
     
         # Load YOLOv8 model using cache
-        model = get_model('./yolo11m.pt')
+        model = get_model('./API/yolo11m.pt')
 
         # Load image
         image = cv2.imread(image_path)
@@ -92,7 +92,7 @@ def detect_video():
         video_path = data['video_path']
 
         # Load YOLOv8 model using cache
-        model = get_model('./yolo11m.pt')
+        model = get_model('./API/yolo11m.pt')
 
         # Open video capture
         cap = cv2.VideoCapture(video_path)
@@ -427,7 +427,7 @@ def detect_person_video_fast():
         video_path = data['video_path']
 
         # Use cached model
-        model = get_model('./yolo11m.pt')
+        model = get_model('./API/yolo11m.pt')
 
         # Open video capture
         cap = cv2.VideoCapture(video_path)
@@ -846,10 +846,18 @@ def camera_detect_live(camera_index):
     def generate_frames_with_detection():
         cap = cv2.VideoCapture(camera_index)
         if not cap.isOpened():
+            print(f"[detect_live] Cannot open camera {camera_index}")
+            return
+        
+        # Try to read a test frame to verify camera works
+        ret, test_frame = cap.read()
+        if not ret:
+            print(f"[detect_live] Camera {camera_index} cannot read frames")
+            cap.release()
             return
         
         # Load YOLO model for detection
-        model = get_model('./yolo11m.pt')  # Using person model, can be made configurable
+        model = get_model('./API/yolo11m.pt')  # Using person model, can be made configurable
         
         # Get confidence threshold from query parameter, default to 0.5
         confidence_threshold = float(request.args.get('confidence', 0.5))
@@ -949,10 +957,18 @@ def camera_detect_live_car(camera_index):
     def generate_frames_with_detection():
         cap = cv2.VideoCapture(camera_index)
         if not cap.isOpened():
+            print(f"[detect_live_car] Cannot open camera {camera_index}")
+            return
+        
+        # Try to read a test frame to verify camera works
+        ret, test_frame = cap.read()
+        if not ret:
+            print(f"[detect_live_car] Camera {camera_index} cannot read frames")
+            cap.release()
             return
         
         # Load YOLO model for car detection
-        model = get_model('./models/best.pt')
+        model = get_model('./API/models/best.pt')
         
         # Get confidence threshold from query parameter, default to 0.5
         confidence_threshold = float(request.args.get('confidence', 0.5))
