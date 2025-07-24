@@ -1,0 +1,1 @@
+web: cd code && python simple_app.py 
