@@ -956,4 +956,8 @@ def get_live_detection_counts_proxy():
         return jsonify({"error": f"Live detection counts error: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    app.run(debug=False, host=WEBAPP_HOST, port=WEBAPP_PORT) 
+    # Development server
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+else:
+    # Production server (for gunicorn)
+    application = app 
