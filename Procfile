@@ -1,1 +1,1 @@
-web: cd code && python simple_app.py 
+web: python app.py 
