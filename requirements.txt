@@ -2,7 +2,6 @@ Flask==2.3.3
 Flask-CORS==4.0.0
 Flask-SocketIO==5.3.6
 requests==2.31.0
-opencv-python>=4.12.0
 numpy>=2.0.0
-ultralytics>=8.0.0
-gunicorn>=20.1.0 
+gunicorn>=20.1.0
+# Excluding opencv-python and ultralytics for now - will install separately if needed 
